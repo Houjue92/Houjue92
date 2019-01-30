@@ -1,445 +1,169 @@
-import math
-import csv
-import numpy as np
-from collections import Counter
+import torch as th
+from torch.nn import Module, CrossEntropyLoss
+from torch.autograd import Variable
+from torch.optim import SGD
+
 #-------------------------------------------------------------------------
 '''
-    Problem 1: Decision Tree (with Descrete Attributes)
-    In this problem, you will implement the decision tree method for classification problems.
+    Problem 1: Softmax Regression using Pytorch 
+    In this problem, you will implement the softmax regression method using PyTorch. 
+    The main goal of this problem is to get familiar with the pytorch package for deep learning methods.
+    You may need to use a Linux or Mac OS computer to install pytorch package.
+    Please follow the instructions in this page to install pytorch package: http://pytorch.org/
+    For windows computers, you could use dual OS, a virtual machine or docker to create a linux environment.
     You could test the correctness of your code by typing `nosetests -v test1.py` in the terminal.
+    Note: please don't use torch.nn.Linear in the problem. Use Pytorch tensors/Variables to implement your own version of softmax regression.
 '''
-        
-#-----------------------------------------------
-class Node:
-    '''
-        Decision Tree Node (with discrete attributes)
-        Inputs: 
-            X: the data instances in the node, a numpy matrix of shape p by n.
-               Each element can be int/float/string.
-               Here n is the number data instances in the node, p is the number of attributes.
-            Y: the class labels, a numpy array of length n.
-               Each element can be int/float/string.
-            i: the index of the attribute being tested in the node, an integer scalar 
-            C: the dictionary of attribute values and children nodes. 
-               Each (key, value) pair represents an attribute value and its corresponding child node.
-            isleaf: whether or not this node is a leaf node, a boolean scalar
-            p: the label to be predicted on the node (i.e., most common label in the node).
-    '''
-    def __init__(self,X,Y, i=None,C=None, isleaf= False,p=None):
-        self.X = X
-        self.Y = Y
-        self.i = i
-        self.C= C
-        self.isleaf = isleaf
-        self.p = p
 
-#-----------------------------------------------
-class Tree(object):
-    '''
-        Decision Tree (with discrete attributes). 
-        We are using ID3(Iterative Dichotomiser 3) algorithm. So this decision tree is also called ID3.
-    '''
-    #--------------------------
-    @staticmethod
-    def entropy(Y):
+#-------------------------------------------------------
+class SoftmaxRegression(Module):
+    '''SoftmaxRegression is the softmax regression model with a single linear layer'''
+    # ----------------------------------------------
+    def __init__(self, p, c):
+        ''' Initialize the softmax regression model. Create parameters W and b. Create a loss function object.  
+            Inputs:
+                p: the number of input features, an integer scalar
+                c: the number of output classes, an integer scalar
+            Outputs:
+                self.W: the weight matrix parameter, a torch Variable of shape (p, c), initialized as all-zeros
+                self.b: the bias vector parameter, a torch Variable of shape (c), initialized as all-zeros
+                self.loss_fn: the loss function object for softmax regression.
+            Hint: you could use CrossEntropyLoss class in torch.nn.
+            Note: In this problem, the parameters are initialized as all-zeros for testing purpose only. In real-world cases, we usually initialize them with random values.
         '''
-            Compute the entropy of a list of values.
+        super(SoftmaxRegression, self).__init__()
+        #########################################
+        ## INSERT YOUR CODE HERE
+        self.W = Variable(th.FloatTensor(p, c).zero_(), requires_grad=True)
+        self.b = Variable(th.FloatTensor(c).zero_(), requires_grad=True)
+        self.loss_fn = th.nn.CrossEntropyLoss()
+
+        #########################################
+
+    # ----------------------------------------------
+    def forward(self, x):
+        '''
+           Given a batch of training instances, compute the linear logits z. 
             Input:
-                Y: a list of values, a numpy array of int/float/string values.
+                x: the feature vectors of a batch of training instance, a float torch Tensor of shape n by p. Here p is the number of features/dimensions. 
+                    n is the number of instances in the batch.
+                self.W: the weight matrix of softmax regression, a float torch Variable matrix of shape (p by c). Here c is the number of classes.
+                self.b: the bias values of softmax regression, a float torch Variable vector of shape c by 1.
             Output:
-                e: the entropy of the list of values, a float scalar
-            Hint: you could use collections.Counter.
+                z: the logit values of the batch of training instances, a float matrix of shape n by c. Here c is the number of classes
+            Hint: you could solve this problem using one line of code.
         '''
         #########################################
         ## INSERT YOUR CODE HERE
-        cur = Counter(Y)
-        e = 0.
-        for key in cur.iterkeys(): 
-            p = float(cur[key])/sum(cur.values())
-            E = -p*(math.log(p)/math.log(2))
-            e += E
-        
-        
+        z = x.mm(self.W) + self.b
 
-     
-    
         #########################################
-        return e 
-    
-    
-            
-    #--------------------------
-    @staticmethod
-    def conditional_entropy(Y,X):
+        return z
+
+    #-----------------------------------------------------------------
+    def compute_L(self, z,y):
         '''
-            Compute the conditional entropy of y given x.
+            Compute multi-class cross entropy loss, which is the loss function of softmax regression. 
             Input:
-                Y: a list of values, a numpy array of int/float/string values.
-                X: a list of values, a numpy array of int/float/string values.
+                z: the logit values of training instances in a mini-batch, a float matrix of shape n by c. Here c is the number of classes
+                y: the labels of a batch of training instances, an integer vector of length n. The values can be 0,1,2, ..., or (c-1).
             Output:
-                ce: the conditional entropy of y given x, a float scalar
+                L: the cross entropy loss of the batch, a float scalar. It's the average of the cross entropy loss on all instances in the batch.
+            Hint: you could solve this problem using one line of code.
         '''
         #########################################
         ## INSERT YOUR CODE HERE
-        q = Counter(X)
-        ce = 0
-        for key in q.iterkeys():
-            qx = float(q[key])/sum(q.values())
-            m = np.array([index for index, value in enumerate(X) if value == key])
-            l = []
-            for i in m:
-                l.append(Y[i])
-            n = Counter(l)
-            pl = 0
-            for key in n.iterkeys():
-                a = float(n[key])/sum(n.values())
-                pl += a*math.log(a,2)
-            ce += -qx*pl
-         
-        
-   
+        L = self.loss_fn(z, y)
 
-
- 
         #########################################
-        return ce 
-    
-    
-    
-    #--------------------------
-    @staticmethod
-    def information_gain(Y,X):
+        return L 
+
+
+
+    #-----------------------------------------------------------------
+    def backward(self, L):
         '''
-            Compute the information gain of y after spliting over attribute x
+           Back Propagation: given compute the local gradients of the logits z, activations a, weights W and biases b on the instance. 
             Input:
-                X: a list of values, a numpy array of int/float/string values.
-                Y: a list of values, a numpy array of int/float/string values.
+                L: the cross entropy loss of the batch, a float scalar. It's the average loss on all instances in the batch.
             Output:
-                g: the information gain of y after spliting over x, a float scalar
+                self.W.grad: the average of the gradient of loss L w.r.t. the weight matrix W in the batch of training instances, a float matrix of shape (p by c). 
+                       The i,j -th element of dL_dW represents the partial gradient of the loss w.r.t. the weight W[i,j]:   d_L / d_W[i,j]
+                self.b.grad: the average of the gradient of the loss L w.r.t. the biases b, a float vector of length c . 
+                       Each element dL_db[i] represents the partial gradient of loss L w.r.t. the i-th bias:  d_L / d_b[i]
+            Hint: pytorch Variable provides automatic computation of gradients. You could solve this problem using one line of code.
         '''
         #########################################
         ## INSERT YOUR CODE HERE
-        e = Tree.entropy(Y)
-        
-        ce = Tree.conditional_entropy(Y,X)
-        
-        g = e - ce
-        
- 
+        L.backward()
+        print(self.W.grad.data)
+        print(self.b.grad.data)
         #########################################
-        return g
 
+
+    # ----------------------------------------------
+    def train(self, loader, n_epoch=10,alpha=0.01):
+        """train the model
+              Input:
+                loader: dataset loader, which loads one batch of dataset at a time.
+                n_epoch: the number of epochs, an integer scalar
+                alpha: the learning rate for SGD(stochastic gradient descent), a float scalar
+              Note: after each training step, please set the gradients to 0 before starting the next training step.
+        """
+
+        # create a SGD optimizer
+        optimizer = SGD([self.W,self.b], lr=alpha)
+        # go through the dataset n_epoch times
+        for _ in xrange(n_epoch):
+            # use loader to load one batch of training data
+            for x,y in loader:
+                # convert data tensors into Variables
+                x = Variable(x)
+                y = Variable(y)
+                #########################################
+                ## INSERT YOUR CODE HERE
+                print x.data
+                # forward pass
+                z = self.forward(x)
+                # compute loss
+                L = self.compute_L(z,y)
+                # backward pass: compute gradients
+                L.backward()
+
+                # update model parameters
+                optimizer.step()
+                # reset the gradients of W and b to zero
+                optimizer.zero_grad()
+                #########################################
 
     #--------------------------
-    @staticmethod
-    def best_attribute(X,Y):
+    def test(self, loader):
         '''
-            Find the best attribute to split the node. 
-            Here we use information gain to evaluate the attributes. 
-            If there is a tie in the best attributes, select the one with the smallest index.
+           Predict the labels of one batch of testing instances using softmax regression.
             Input:
-                X: the feature matrix, a numpy matrix of shape p by n. 
-                   Each element can be int/float/string.
-                   Here n is the number data instances in the node, p is the number of attributes.
-                Y: the class labels, a numpy array of length n. Each element can be int/float/string.
+                loader: dataset loader, which loads one batch of dataset at a time.
             Output:
-                i: the index of the attribute to split, an integer scalar
+                accuracy: the accuracy 
         '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        l = []
-        p = X.shape[0]
-        for i in range(p):
-            ig = Tree.information_gain(Y,X[i])
-            l.append(ig)
-        i = np.argmax(l)
-   
+        correct = 0.
+        total = 0.
+        # load dataset
+        for x,y in loader:
+            x = Variable(x) # one batch of testing instances, wrapped in Variable
+            #########################################
+            ## INSERT YOUR CODE HERE
 
- 
-        #########################################
-        return i
+            # predict labels of the batch of testing data
 
-        
-    #--------------------------
-    @staticmethod
-    def split(X,Y,i):
-        '''
-            Split the node based upon the i-th attribute.
-            (1) split the matrix X based upon the values in i-th attribute
-            (2) split the labels Y based upon the values in i-th attribute
-            (3) build children nodes by assigning a submatrix of X and Y to each node
-            (4) build the dictionary to combine each  value in the i-th attribute with a child node.
-    
-            Input:
-                X: the feature matrix, a numpy matrix of shape p by n.
-                   Each element can be int/float/string.
-                   Here n is the number data instances in the node, p is the number of attributes.
-                Y: the class labels, a numpy array of length n.
-                   Each element can be int/float/string.
-                i: the index of the attribute to split, an integer scalar
-            Output:
-                C: the dictionary of attribute values and children nodes. 
-                   Each (key, value) pair represents an attribute value and its corresponding child node.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        dict = {}
-        for l in range(X.shape[1]):
-            if X[i,l] in dict:
-                dict[X[i,l]].append(l)
-            else:
-                dict[X[i,l]] = []
-                dict[X[i,l]].append(l)
-        C = {}
-        for key, value in dict.iteritems():
-            X1 = X[:,value]
-            Y1 = Y[value]
-            C[key] = Node(X1,Y1)
-    
-            
+            output = self.forward(x)
+            _,y_predicted = th.max(output.data,1)
 
+            #########################################
+            total += y.size(0)
+            correct += (y_predicted == y).sum()
+        accuracy = correct / total
+        return accuracy
 
-        #########################################
-        return C
-
-    #--------------------------
-    @staticmethod
-    def stop1(Y):
-        '''
-            Test condition 1 (stop splitting): whether or not all the instances have the same label. 
-    
-            Input:
-                Y: the class labels, a numpy array of length n.
-                   Each element can be int/float/string.
-            Output:
-                s: whether or not Conidtion 1 holds, a boolean scalar. 
-                True if all labels are the same. Otherwise, false.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        s = all(n == Y[0] for n in Y)
-        
-        #########################################
-        return s
-    
-    #--------------------------
-    @staticmethod
-    def stop2(X):
-        '''
-            Test condition 2 (stop splitting): whether or not all the instances have the same attributes. 
-            Input:
-                X: the feature matrix, a numpy matrix of shape p by n.
-                   Each element can be int/float/string.
-                   Here n is the number data instances in the node, p is the number of attributes.
-            Output:
-                s: whether or not Conidtion 2 holds, a boolean scalar. 
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        l = []
-        for i in range(X.shape[0]):
-            Xi = X[i,:]
-            si = all(n == Xi[0] for n in Xi)
-            l.append(si)
-        if l[0] == True and all(m == l[0] for m in l):
-            s = True
-        else:
-            s = False
-   
-
-
-
- 
-        #########################################
-        return s
-    
-            
-    #--------------------------
-    @staticmethod
-    def most_common(Y):
-        '''
-            Get the most-common label from the list Y. 
-            Input:
-                Y: the class labels, a numpy array of length n.
-                   Each element can be int/float/string.
-                   Here n is the number data instances in the node.
-            Output:
-                y: the most common label, a scalar, can be int/float/string.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        d = Counter(Y)
-        y = d.most_common(1)[0][0]
-
- 
-        #########################################
-        return y
-    
-    
-    
-    #--------------------------
-    @staticmethod
-    def build_tree(t):
-        '''
-            Recursively build tree nodes.
-            Input:
-                t: a node of the decision tree, without the subtree built.
-                t.X: the feature matrix, a numpy float matrix of shape n by p.
-                   Each element can be int/float/string.
-                    Here n is the number data instances, p is the number of attributes.
-                t.Y: the class labels of the instances in the node, a numpy array of length n.
-                t.C: the dictionary of attribute values and children nodes. 
-                   Each (key, value) pair represents an attribute value and its corresponding child node.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        t.p = Tree.most_common(t.Y)
-        
-        # if Condition 1 or 2 holds, stop recursion 
-        if Tree.stop1(t.Y) == True or Tree.stop2(t.X) == True:
-            t.isleaf = True
-            return 
-            
-                    
-
-
- 
-        # find the best attribute to split
-        t.i = Tree.best_attribute(t.X,t.Y)
-
-
- 
-        # recursively build subtree on each child node
-        t.C = Tree.split(t.X,t.Y,t.i)
-        for key, value in t.C.iteritems():
-            node_c = value
-            Tree.build_tree(node_c)
-            
-
-
- 
-        #########################################
-    
-    
-    #--------------------------
-    @staticmethod
-    def train(X, Y):
-        '''
-            Given a training set, train a decision tree. 
-            Input:
-                X: the feature matrix, a numpy matrix of shape p by n.
-                   Each element can be int/float/string.
-                   Here n is the number data instances in the training set, p is the number of attributes.
-                Y: the class labels, a numpy array of length n.
-                   Each element can be int/float/string.
-            Output:
-                t: the root of the tree.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        tNode = Node(X = X, Y = Y)
-        Tree.build_tree(tNode)
-        t = tNode
-   
-
- 
-        #########################################
-        return t
-    
-    
-    
-    #--------------------------
-    @staticmethod
-    def inference(t,x):
-        '''
-            Given a decision tree and one data instance, infer the label of the instance recursively. 
-            Input:
-                t: the root of the tree.
-                x: the attribute vector, a numpy vectr of shape p.
-                   Each attribute value can be int/float/string.
-            Output:
-                y: the class labels, a numpy array of length n.
-                   Each element can be int/float/string.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        
-        if t.isleaf == True:
-            y = t.p
-            
-        
-        else:
-            if x[t.i] in t.C.keys():
-                    y = Tree.inference(t.C[x[t.i]],x)
-            else:
-                y = t.p
-                
-                     
-                
-        #########################################
-        return y
-    
-    #--------------------------
-    @staticmethod
-    def predict(t,X):
-        '''
-            Given a decision tree and a dataset, predict the labels on the dataset. 
-            Input:
-                t: the root of the tree.
-                X: the feature matrix, a numpy matrix of shape p by n.
-                   Each element can be int/float/string.
-                   Here n is the number data instances in the dataset, p is the number of attributes.
-            Output:
-                Y: the class labels, a numpy array of length n.
-                   Each element can be int/float/string.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        l = []
-        for i in range(X.shape[1]):
-            x = X[:,i]
-            y = Tree.inference(t,x)
-            l.append(y)
-        Y = np.array(l)
-        
-
-
-        #########################################
-        return Y
-
-
-
-    #--------------------------
-    @staticmethod
-    def load_dataset(filename='data1.csv'):
-        '''
-            Load dataset 1 from the CSV file: 'data1.csv'. 
-            The first row of the file is the header (including the names of the attributes)
-            In the remaining rows, each row represents one data instance.
-            The first column of the file is the label to be predicted.
-            In remaining columns, each column represents an attribute.
-            Input:
-                filename: the filename of the dataset, a string.
-            Output:
-                X: the feature matrix, a numpy matrix of shape p by n.
-                   Each element can be int/float/string.
-                   Here n is the number data instances in the dataset, p is the number of attributes.
-                Y: the class labels, a numpy array of length n.
-                   Each element can be int/float/string.
-        '''
-        #########################################
-        ## INSERT YOUR CODE HERE
-        reader = csv.reader(open("data1.csv", "rb"), delimiter=",")
-        x = list(reader)
-        a = np.array(x) 
-        b = a.copy()
-        X = a[1:,1:].T
-        Y = b[1:,0].T
-
-
- 
-        #########################################
-        return X,Y
 
 
 
