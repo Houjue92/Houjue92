@@ -1,2 +1,2 @@
 # Houjue92
-Machine learning projects
+Implementation and solve problems of Machine learning algorithms
