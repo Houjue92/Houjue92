@@ -1,2 +1,2 @@
 # Houjue92
-Implementation and solve problems of Machine learning algorithms
+Solve problems by implementing of Machine learning algorithms.
