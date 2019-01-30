@@ -1,2 +1,2 @@
 # Houjue92
-Machine learning course projects
+Machine learning projects
