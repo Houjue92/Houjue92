@@ -1,522 +1,401 @@
 import math
+import csv
 import numpy as np
+from problem1 import Tree
 #-------------------------------------------------------------------------
 '''
-    Problem 2: Logistic Regression 
-    In this problem, you will implement the logistic regression method for binary classification problems.
-    The main goal of this problem is to get familiar with a model-based classification method, and how to train the model parameters on the training data.
-    We will get familiar with gradient computation using the chain rule. 
-    We will use cross entropy as the loss function and stochastic gradient descent to train the model parameters.
-    You could test the correctness of your code by typing `nosetests test2.py` in the terminal.
-
-    Notations:
-            ---------- input data ----------------------
-            p: the number of input features.
-            x: the feature vector of a data instance, a float numpy matrix of shape p by 1. 
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-
-            ---------- model parameters ----------------------
-            w: the weights parameter of the logistic model, a float numpy matrix of shape p by 1. 
-            b: the bias parameter of the logistic model, a float scalar.
-
-            ---------- values ----------------------
-            z: the logit value, a float scalar
-            a: the activation value, a float scalar
-            L: the cross entropy loss value, a float scalar.
-
-            ---------- partial gradients ----------------------
-            dL_da: the partial gradient of the loss function L w.r.t. the activation a, a float scalar value. It represents (d_L / d_a)
-            da_dz: the partial gradient of the activation a w.r.t. the logit z, a float scalar value. It represents (d_a / d_z)
-            dz_dw: the partial gradients of the logit z w.r.t. the weights w, a numpy float matrix of shape (p by 1). It represents (d_z / d_w)
-                   The i-th element represents ( d_z / d_w[i])
-            dz_db: the partial gradient of logit z w.r.t. the bias b, a float scalar. It represents (d_z / d_b).
-
-            ---------- partial gradients of parameters ------------------
-            dL_dw: the partial gradient of the loss function L w.r.t. the weight vector w, a numpy float matrix of shape (p by 1). 
-                   The i-th element represents ( d_L / d_w[i])
-            dL_db: the partial gradient of the loss function L w.r.t. the bias b, a float scalar. 
-
-            ---------- training ----------------------
-            alpha: the step-size parameter of gradient descent, a float scalar.
-            n_epoch: the number of passes to go through the training dataset in the training process, an integer scalar.
+    Problem 2: Decision Tree (with continous attributes)
+    In this problem, you will implement the decision tree method for classification problems.
+    You could test the correctness of your code by typing `nosetests -v test2.py` in the terminal.
 '''
 
-#-----------------------------------------------------------------
-# Forward Pass 
-#-----------------------------------------------------------------
-
 #--------------------------
-def compute_z(x,w,b):
+class Node:
     '''
-        Compute the linear logit value of a data instance. z = <w, x> + b
-        Here <w, x> represents the dot product of the two vectors.
-        Input:
-            x: the feature vector of a data instance, a float numpy matrix of shape p by 1. 
-            w: the weights parameter of the logistic model, a float numpy matrix of shape p by 1. 
-            b: the bias value of the logistic model, a float scalar.
-        Output:
-            z: the logit value of the instance, a float scalar
-        Hint: you could solve this problem using 1 line of code. Though using more lines of code is also okay.
+        Decision Tree Node (with continous attributes)
+        Inputs: 
+            X: the data instances in the node, a numpy matrix of shape p by n.
+               Each element can be int/float.
+               Here n is the number data instances in the node, p is the number of attributes.
+            Y: the class labels, a numpy array of length n.
+               Each element can be int/float/string.
+            i: the index of the attribute being tested in the node, an integer scalar 
+            th: the threshold on the attribute, a float scalar.
+            C1: the child node for values smaller than threshold
+            C2: the child node for values larger than threshold
+            isleaf: whether or not this node is a leaf node, a boolean scalar
+            p: the label to be predicted on the node (i.e., most common label in the node).
     '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    z = np.dot(w.T,x) + b
-    #########################################
-    return z 
+    def __init__(self,X=None,Y=None, i=None,th=None,C1=None, C2=None, isleaf= False,p=None):
+        self.X = X
+        self.Y = Y
+        self.i = i
+        self.th = th 
+        self.C1= C1
+        self.C2= C2
+        self.isleaf = isleaf
+        self.p = p
 
-#--------------------------
-def compute_a(z):
-    '''
-        Compute the sigmoid activation.
-        Input:
-            z: the logit value of logistic regression, a float scalar.
-        Output:
-            a: the activation, a float scalar
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    if z > 10:
-        a = 0.99999
-    elif z < -10:
-        a = 0.00001
-    else:
-        a = 1 / (1 + math.exp(-z))
-    #########################################
-    return a
 
-#--------------------------
-def compute_L(a,y):
+#-----------------------------------------------
+class DT(Tree):
     '''
-        Compute the loss function: the negative log likelihood, which is the negative logarithm of the likelihood. 
-        This function is also called cross-entropy.
-        Input:
-            a: the activation of a training instance, a float scalar
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-        Output:
-            L: the loss value of logistic regression, a float scalar.
+        Decision Tree (with contineous attributes)
+        Hint: DT is a subclass of Tree class in problem1. So you can reuse and overwrite the code in problem 1.
     '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    if a == 1 :
-        loga = math.log(a)
-        logam = -1e6
-    elif a == 0:
-        loga = -1e6
-        logam = math.log(1 - a)
-    else:
-        loga = math.log(a)
-        logam = math.log(1 - a)
-    L = -y * loga - (1 - y) * logam
-    #########################################
-    return L 
 
-#--------------------------
-def forward(x,y,w,b):
-    '''
-       Forward pass: given an instance in the training data, compute the logit z, activation a and cross entropy L on the instance. 
-        Input:
-            x: the feature vector of a training instance, a float numpy matrix of shape p by 1. Here p is the number of features/dimensions.
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-            w: the weight vector, a float numpy matrix of shape p by 1.
-            b: the bias value, a float scalar.
-        Output:
-            z: linear logit of the instance, a float scalar
-            a: activation, a float scalar
-            L: the cross entropy loss on the training instance, a float scalar. 
-        Hint: you could solve this problem using 3 lines of code. Though using more lines of code is also okay.
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    z = compute_z(x,w,b)
-    a = compute_a(z)
-    L = compute_L(a,y)
-    #########################################
-    return z, a, L 
+    #--------------------------
+    @staticmethod
+    def cutting_points(X,Y):
+        '''
+            Find all possible cutting points in the continous attribute of X. 
+            (1) sort unique attribute values in X, like, x1, x2, ..., xn
+            (2) consider splitting points of form (xi + x(i+1))/2 
+            (3) only consider splitting between instances of different classes
+            (4) if there is no candidate cutting point above, use -inf as a default cutting point.
+            Input:
+                X: a list of values, a numpy array of int/float values.
+                Y: a list of values, a numpy array of int/float/string values.
+            Output:
+                cp: the list of  potential cutting points, a float numpy vector. 
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        dict = {}
+        for i in range(len(X)):
+            if X[i] in dict:
+                dict[X[i]].append(Y[i])
+            else:
+                dict[X[i]] = []
+                dict[X[i]].append(Y[i])
+                
+            
+        x = np.sort(np.unique(X))
+        cp = []
+        for i in range(len(x)-1):
+            c = float(x[i] + x[i+1])/2
+            s1 = set(dict[x[i]])
+            s2 = set(dict[x[i+1]])
+            if len(s1) == len(s2) and len(s1) ==2:
+                cp.append(c)
+            if len(s1) == 1 and len(s2) ==1 and  list(s1)[0] != list(s2)[0] :
+                cp.append(c)
+            if len(s1) != len(s2):
+                cp.append(c) 
+        cp = np.array(cp)
+        if len(cp) == 0:
+            cp = np.array([- float('inf')])
+            
 
 
 
-#-----------------------------------------------------------------
-# Compute Local Gradients
-#-----------------------------------------------------------------
 
 
-#--------------------------
-def compute_dL_da(a, y):
-    '''
-        Compute local gradient of the cross-entropy function (the Loss function) L w.r.t. the activation a.
-        Input:
-            a: the activation value, a float scalar
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-        Output:
-            dL_da: the local gradient of the loss function w.r.t. the activation, a float scalar value.
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    if y == 0:
-        if a == 1:
-            dL_da = 1e6
+        #########################################
+        return cp
+    
+    #--------------------------
+    @staticmethod
+    def best_threshold(X,Y):
+        '''
+            Find the best threshold among all possible cutting points in the continous attribute of X. 
+            Input:
+                X: a list of values, a numpy array of int/float values.
+                Y: a list of values, a numpy array of int/float/string values.
+            Output:
+                th: the best threhold, a float scalar. 
+                g: the information gain by using the best threhold, a float scalar. 
+            Hint: you can reuse your code in problem 1.
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        cp = DT.cutting_points(X,Y)
+        if cp[0] == - float('inf'):
+            th = - float('inf')
+            g = -1.
         else:
-            dL_da = 1 / (1 - a)
-    if y == 1:
-        if a == 0:
-            dL_da = -1e6
-        else:
-            dL_da = -1 / a
-    #########################################
-    return dL_da 
+            l =[]
+            for i in range(len(cp)):
+                t = X.copy()
+                for j in range(len(t)):
+                    if t[j] >= cp[i]:
+                        t[j] = 1
+                    else:
+                        t[j] = 0
+                    
+                ig = Tree.information_gain(Y,t)
+                l.append(ig)
+        
+            g = max(l)
+            b = np.argmax(l)
+            th = cp[b]
+        
+       
+        
+
+
+
+        #########################################
+        return th,g 
+    
+    
+    #--------------------------
+    def best_attribute(self,X,Y):
+        '''
+            Find the best attribute to split the node. The attributes have continous values (int/float).
+            Here we use information gain to evaluate the attributes. 
+            If there is a tie in the best attributes, select the one with the smallest index.
+            Input:
+                X: the feature matrix, a numpy matrix of shape p by n. 
+                   Each element can be int/float/string.
+                   Here n is the number data instances in the node, p is the number of attributes.
+                Y: the class labels, a numpy array of length n. Each element can be int/float/string.
+            Output:
+                i: the index of the attribute to split, an integer scalar
+                th: the threshold of the attribute to split, a float scalar
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        l1 = []
+        l2 = []
+        for i in range(X.shape[0]):
+            th,g = DT.best_threshold(X[i],Y)
+            l1.append(th)
+            l2.append(g)
+        
+        i = np.argmax(l2)
+        th = l1[i]
+
+
 
 
  
-#--------------------------
-def compute_da_dz(a):
-    '''
-        Compute local gradient of the sigmoid activation a w.r.t. the logit z.
-        Input:
-            a: the activation value of the sigmoid function, a float scalar
-        Output:
-            da_dz: the local gradient of the activation w.r.t. the logit z, a float scalar value.
-        Hint: the gradient da_dz only depends on the activation a, instead of the logit z.
-        Hint: you could solve this problem using 1 line of code.
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    da_dz = a * (1 - a)
-    #########################################
-    return da_dz 
-
-#--------------------------
-def compute_dz_dw(x):
-    '''
-        Compute partial gradients of the logit function z with respect to (w.r.t.) the weights w. 
-        Input:
-            x: the feature vector of a data instance, a float numpy matrix of shape p by 1. 
-               Here p is the number of features/dimensions.
-        Output:
-            dz_dw: the partial gradients of the logit z with respect to the weights w, a numpy float matrix of shape p by 1. 
-                   The i-th element represents ( d_z / d_w[i])
-        Hint: you could solve this problem using 1 line of code. 
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    dz_dw = x
-    #########################################
-    return dz_dw
-
-
-#--------------------------
-def compute_dz_db():
-    '''
-        Compute partial gradient of the logit function z with respect to (w.r.t.) the bias b. 
-        Output:
-            dz_db: the partial gradient of logit z with respect to the bias b, a float scalar. It represents (d_z / d_b).
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    dz_db = 1
-    #########################################
-    return dz_db
-
-
-#-----------------------------------------------------------------
-# Back Propagation 
-#-----------------------------------------------------------------
-
-#--------------------------
-def backward(x,y,a):
-    '''
-       Back Propagation: given an instance in the training data, compute the local gradients for logit, activation, weights and bias on the instance. 
-        Input:
-            x: the feature vector of a data instance, a float numpy matrix of shape p by 1. 
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-            a: the activation, a float scalar
-        Output:
-            dL_da: the local gradient of the loss function w.r.t. the activation, a float scalar value.
-            da_dz: the local gradient of the activation a w.r.t. the logit z, a float scalar value. It represents ( d_a / d_z )
-            dz_dw: the partial gradient of logit z with respect to the weight vector, a numpy float matrix of shape (p by 1). 
-                   The i-th element represents ( d_z / d_w[i])
-            dz_db: the partial gradient of logit z with respect to the bias, a float scalar. It represents (d_z / d_b).
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    dL_da = compute_dL_da(a, y)
-    da_dz = compute_da_dz(a)
-    dz_dw = compute_dz_dw(x)
-    dz_db = compute_dz_db()
-    #########################################
-    return dL_da, da_dz, dz_dw, dz_db 
-
-
-
-#--------------------------
-def compute_dL_dw(dL_da, da_dz, dz_dw):
-    '''
-       Given local gradients, compute the gradient of the loss function L w.r.t. the weights w.
-        Input:
-            dL_da: the local gradient of the loss function w.r.t. the activation, a float scalar value.
-            da_dz: the local gradient of the activation a w.r.t. the logit z, a float scalar value. It represents ( d_a / d_z )
-            dz_dw: the partial gradient of logit z with respect to the weight vector, a numpy float matrix of shape (p by 1). 
-                   The i-th element represents ( d_z / d_w[i])
-        Output:
-            dL_dw: the gradient of the loss function w.r.t. the weight vector, a numpy float matrix of shape (p by 1). 
-        Hint: you could solve this problem using 1 lines of code
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    dL_dw = dL_da * da_dz * dz_dw
-    #########################################
-    return dL_dw
-
-
-#--------------------------
-def compute_dL_db(dL_da, da_dz, dz_db):
-    '''
-       Given the local gradients, compute the gradient of the loss function L w.r.t. bias b.
-        Input:
-            dL_da: the local gradient of the loss function w.r.t. the activation, a float scalar value.
-            da_dz: the local gradient of the activation a w.r.t. the logit z, a float scalar value. It represents ( d_a / d_z )
-            dz_db: the partial gradient of logit z with respect to the bias, a float scalar. It represents (d_z / d_b).
-        Output:
-            dL_db: the gradient of the loss function w.r.t. the bias, a float scalar. 
-        Hint: you could solve this problem using 1 lines of code 
-    '''
-    #########################################
-    ## INSERT YOUR CODE HERE
-    dL_db = dL_da * da_dz * dz_db
-    #########################################
-    return dL_db 
-
-
-#-----------------------------------------------------------------
-# gradient descent 
-#-----------------------------------------------------------------
-
-#--------------------------
-def update_w(w, dL_dw, alpha=0.001):
-    '''
-       Given an instance in the training data, update the weights w using gradient descent.
-        Input:
-            w: the current value of the weight vector, a numpy float matrix of shape p by 1.
-            dL_dw: the gradient of the loss function w.r.t. the weight vector, a numpy float matrix of shape p by 1. 
-            alpha: the step-size parameter of gradient descent, a float scalar.
-        Output:
-            w: the updated weight vector, a numpy float matrix of shape p by 1.
-        Hint: you could solve this problem using 1 line of code
-    '''
+        #########################################
+        return i, th
     
-    #########################################
-    ## INSERT YOUR CODE HERE
-    w = w - alpha * dL_dw    
-    #########################################
-    return w
 
-#--------------------------
-def update_b(b, dL_db, alpha=0.001):
-    '''
-       Given an instance in the training data, update the bias b using gradient descent.
-        Input:
-            b: the current value of bias, a float scalar. 
-            dL_db: the gradient of the loss function w.r.t. the bias, a float scalar. 
-            alpha: the step-size parameter of gradient descent, a float scalar.
-        Output:
-            b: the updated of bias, a float scalar. 
-        Hint: you could solve this problem using 1 line of code in the block.
-    '''
+
+        
+    #--------------------------
+    @staticmethod
+    def split(X,Y,i,th):
+        '''
+            Split the node based upon the i-th attribute and its threshold.
+            (1) split the matrix X based upon the values in i-th attribute and threshold
+            (2) split the labels Y 
+            (3) build children nodes by assigning a submatrix of X and Y to each node
     
-    #########################################
-    ## INSERT YOUR CODE HERE
-    b = b - alpha * dL_db
-    #########################################
-    return  b 
-
-
-#--------------------------
-def train(X, Y, alpha=0.001, n_epoch=100):
-    '''
-       Given a training dataset, train the logistic regression model by iteratively updating the weights w and bias b using the gradients computed over each data instance. 
-We repeat n_epoch passes over all the training instances.
-        Input:
-            X: the feature matrix of training instances, a float numpy matrix of shape (n by p). Here n is the number of data instance in the training set, p is the number of features/dimensions.
-            Y: the labels of training instance, a numpy integer matrix of shape n by 1. The values can be 0 or 1.
-            alpha: the step-size parameter of gradient descent, a float scalar.
-            n_epoch: the number of passes to go through the training set, an integer scalar.
-        Output:
-            w: the weight vector trained on the training set, a numpy float matrix of shape p by 1.
-            b: the bias, a float scalar. 
-    '''
-
-    # initialize weights and biases as 0
-    w, b = np.mat(np.zeros(X.shape[1])).T, 0.
-
-    for _ in xrange(n_epoch):
-        for x,y in zip(X,Y):
-            x = x.T # convert to column vector
-            #########################################
-            ## INSERT YOUR CODE HERE
-
-            # Forward pass: compute the logit, sigmoid activation and cross_entropy loss function.
-            z,a,L = forward(x,y,w,b)
-
-            # Back propagation: compute local gradients 
-            dL_da, da_dz, dz_dw, dz_db = backward(x,y,a)
-
-            # compute the global gradients using chain rule 
-            dL_dw = compute_dL_dw(dL_da, da_dz, dz_dw)
-            dL_db = compute_dL_db(dL_da, da_dz, dz_db)
-
-            # update the parameters w and b
-            w = update_w(w, dL_dw, alpha)
-            b = update_b(b, dL_db, alpha)
-            
-            #########################################
-    return w, b
-
-
-
-#--------------------------
-def predict(Xtest, w, b):
-    '''
-       Predict the labels of the instances in a test dataset using logistic regression.
-        Input:
-            Xtest: the feature matrix of testing instances, a float numpy matrix of shape (n_test by p). Here n_test is the number of data instance in the test set, p is the number of features/dimensions.
-            w: the weight vector of the logistic model, a float numpy matrix of shape p by 1.
-            b: the bias value of the logistic model, a float scalar.
-        Output:
-            Y: the predicted labels of test data, an integer numpy array of length ntest. 
-                    If the predicted label is positive, the value is 1. If the label is negative, the value is 0.
-            P: the predicted probability of test data to have positive labels, a float numpy matrix of shape ntest by 1. 
-                    Each value is between 0 and 1, indicating the probability of the instance having the positive label. 
-            Note: If the activation is 0.5, we consider the prediction as positive (instead of negative).
-    '''
-    n = Xtest.shape[0]
-    Y = np.zeros(n) # initialize as all zeros
-    P = np.mat(np.zeros((n,1)))  
-    for i, x in enumerate(Xtest):
-        x = x.T # convert to column vector
+            Input:
+                X: the feature matrix, a numpy matrix of shape p by n.
+                   Each element can be int/float.
+                   Here n is the number data instances in the node, p is the number of attributes.
+                Y: the class labels, a numpy array of length n.
+                   Each element can be int/float/string.
+                i: the index of the attribute to split, an integer scalar
+            Output:
+                C1: the child node for values smaller than threshold
+                C2: the child node for values larger than (or equal to) threshold
+        '''
         #########################################
         ## INSERT YOUR CODE HERE
-        z = compute_z(x,w,b)
-        a = compute_a(z)
-        if a >= 0.5:
-            Y[i] = 1
-        else:
-            Y[i] = 0
-        P[i][0] = a
+        #th,g = DT.best_threshold(X[i],Y)
+        t = X[i].copy()
+        for j in range(X.shape[1]):
+            if t[j] >= th:
+                t[j] = 1.
+            else:
+                t[j] = 0.
+        
+        X1 = X.copy()
+        X1[i] = t
+        dict = {}
+        for l in range(X1.shape[1]):
+            if X1[i,l] in dict:
+                dict[X1[i,l]].append(l)
+            else:
+                dict[X1[i,l]] = []
+                dict[X1[i,l]].append(l)
+        
+        C = {}
+        for key, value in dict.iteritems():
+            X1 = X[:,value]
+            Y1 = Y[value]
+            C[key] = Node(X1,Y1)
+        
+        C1 = C[0.]
+        C2 = C[1.]
+            
+        
+   
+
+
+ 
         #########################################
-    return Y, P
+        return C1, C2
+    
+    
+    
+    #--------------------------
+    def build_tree(self, t):
+        '''
+            Recursively build tree nodes.
+            Input:
+                t: a node of the decision tree, without the subtree built.
+                t.X: the feature matrix, a numpy float matrix of shape n by p.
+                   Each element can be int/float/string.
+                    Here n is the number data instances, p is the number of attributes.
+                t.Y: the class labels of the instances in the node, a numpy array of length n.
+                t.C1: the child node for values smaller than threshold
+                t.C2: the child node for values larger than (or equal to) threshold
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        t.p = Tree.most_common(t.Y)
+        # if Condition 1 or 2 holds, stop recursion 
+        if Tree.stop1(t.Y) == True or Tree.stop2(t.X) == True:
+            t.isleaf = True
+            return 
 
 
-#-----------------------------------------------------------------
-# gradient checking 
-#-----------------------------------------------------------------
+ 
+        # find the best attribute to split
+        dt = DT()
+        t.i,t.th= dt.best_attribute(t.X,t.Y)
 
 
-#--------------------------
-def check_dL_da(a, y, delta=1e-7):
-    '''
-        Compute local gradient of the cross-entropy function w.r.t. the activation using gradient checking.
-        Input:
-            a: the activation value, a float scalar
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-            delta: a small number for gradient check, a float scalar.
-        Output:
-            dL_da: the approximated local gradient of the loss function w.r.t. the activation, a float scalar value.
-    '''
-    dL_da = (compute_L(a+delta,y) - compute_L(a,y)) / delta
-    return dL_da 
+        # recursively build subtree on each child node
+        t.C1,t.C2 = DT.split(t.X,t.Y,t.i,t.th)
+        dt.build_tree(t.C1)
+        dt.build_tree(t.C2)
+
+ 
+        #########################################
+    
+    #--------------------------
+    @staticmethod
+    def inference(t,x):
+        '''
+            Given a decision tree and one data instance, infer the label of the instance recursively. 
+            Input:
+                t: the root of the tree.
+                x: the attribute vector, a numpy vectr of shape p.
+                   Each attribute value can be int/float
+            Output:
+                y: the class labels, a numpy array of length n.
+                   Each element can be int/float/string.
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        if t.isleaf == True:
+            y = t.p
+            
+        
+        else:
+            if x[t.i] < t.th:
+                    y = DT.inference(t.C1,x)
+            else:
+                y = DT.inference(t.C2,x) 
 
 
-#--------------------------
-def check_da_dz(z, delta= 1e-7):
-    '''
-        Compute local gradient of the sigmoid function using gradient check.
-        Input:
-            z: the logit value of logistic regression, a float scalar.
-            delta: a small number for gradient check, a float scalar.
-        Output:
-            da_dz: the approximated local gradient of activation a w.r.t. the logit z, a float scalar value.
-    '''
-    da_dz = (compute_a(z+delta) - compute_a(z)) / delta
-    return da_dz 
 
 
 
-#--------------------------
-def check_dz_dw(x,w, b, delta=1e-7):
-    '''
-        compute the partial gradients of the logit function z w.r.t. weights w using gradient checking.
-        The idea is to add a small number to the weights and b separately, and approximate the true gradient using numerical gradient.
-        Input:
-            x: the feature vector of a data instance, a float numpy vector of length p. Here p is the number of features/dimensions.
-            w: the weight vector of the logistic model, a float numpy vector of length p. 
-            b: the bias value of the logistic model, a float scalar.
-            delta: a small number for gradient check, a float scalar.
-        Output:
-            dz_dw: the approximated partial gradient of logit z w.r.t. the weight vector w computed using gradient check, a numpy float vector of length p. 
-    '''
-    p = x.shape[0] 
-    dz_dw = np.mat(np.zeros(p)).T
-    for i in xrange(p):
-        d = np.mat(np.zeros(p)).T
-        d[i] = delta
-        dz_dw[i] = (compute_z(x,w+d, b) - compute_z(x, w, b)) / delta
-    return dz_dw
+        #########################################
+        return y
+    
+    
+    #--------------------------
+    @staticmethod
+    def predict(t,X):
+        '''
+            Given a decision tree and a dataset, predict the labels on the dataset. 
+            Input:
+                t: the root of the tree.
+                X: the feature matrix, a numpy matrix of shape p by n.
+                   Each element can be int/float.
+                   Here n is the number data instances in the dataset, p is the number of attributes.
+            Output:
+                Y: the class labels, a numpy array of length n.
+                   Each element can be int/float/string.
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        l = []
+        for i in range(X.shape[1]):
+            x = X[:,i]
+            y = DT.inference(t,x)
+            l.append(y)
+        Y = np.array(l)
 
 
-#--------------------------
-def check_dz_db(x,w, b, delta=1e-7):
-    '''
-        compute the partial gradients of the logit function z w.r.t. the bias b using gradient checking.
-        The idea is to add a small number to the weights and b separately, and approximate the true gradient using numerical gradient.
-        For example, the true gradient of logit z w.r.t. bias can be approximated as  [z(w,b+ delta) - z(w,b)] / delta , here delta is a small number.
-        Input:
-            x: the feature vector of a data instance, a float numpy vector of length p. Here p is the number of features/dimensions.
-            w: the weight vector of the logistic model, a float numpy vector of length p. 
-            b: the bias value of the logistic model, a float scalar.
-            delta: a small number for gradient check, a float scalar.
-        Output:
-            dz_dw: the approximated partial gradient of logit z w.r.t. the weight vector w computed using gradient check, a numpy float vector of length p. 
-            dz_db: the approximated partial gradient of logit z w.r.t. the bias b using gradient check, a float scalar.
-    '''
-    dz_db = (compute_z(x, w, b+delta) - compute_z(x, w, b)) / delta
-    return  dz_db
 
-#--------------------------
-def check_dL_dw(x,y,w,b, delta=1e-7):
-    '''
-       Given an instance in the training data, compute the gradient of the weights w using gradient check.
-        Input:
-            x: the feature vector of a training instance, a float numpy vector of length p. Here p is the number of features/dimensions.
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-            w: the weight vector, a float numpy vector of length p.
-            b: the bias value, a float scalar.
-            delta: a small number for gradient check, a float scalar.
-        Output:
-            dL_dw: the approximated gradient of the loss function w.r.t. the weight vector, a numpy float vector of length p. 
-    '''
-    p = x.shape[0] # number of features
-    dL_dw = np.mat(np.zeros(p)).T
-    for i in xrange(p):
-        d = np.mat(np.zeros(p)).T
-        d[i] = delta
-        dL_dw[i] = (forward(x,y,w+d,b)[-1] - forward(x,y,w,b)[-1]) / delta
-    return dL_dw
 
-#--------------------------
-def check_dL_db(x,y,w,b, delta=1e-7):
-    '''
-       Given an instance in the training data, compute the gradient of the bias b using gradient check.
-        Input:
-            x: the feature vector of a training instance, a float numpy vector of length p. Here p is the number of features/dimensions.
-            y: the label of a training instance, an integer scalar value. The values can be 0 or 1.
-            w: the weight vector, a float numpy vector of length p.
-            b: the bias value, a float scalar.
-            delta: a small number for gradient check, a float scalar.
-        Output:
-            dL_db: the approximated gradient of the loss function w.r.t. the bias, a float scalar. 
-    '''
-    dL_db = (forward(x,y,w,b+delta)[-1] - forward(x,y,w,b)[-1]) / delta
-    return dL_db
 
+
+        #########################################
+        return Y
+    
+    
+    
+    #--------------------------
+    def train(self, X, Y):
+        '''
+            Given a training set, train a decision tree. 
+            Input:
+                X: the feature matrix, a numpy matrix of shape p by n.
+                   Each element can be int/float/string.
+                   Here n is the number data instances in the training set, p is the number of attributes.
+                Y: the class labels, a numpy array of length n.
+                   Each element can be int/float/string.
+            Output:
+                t: the root of the tree.
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        tNode = Node(X = X, Y = Y)
+        dt = DT()
+        dt.build_tree(tNode)
+        t = tNode
+   
+
+
+ 
+        #########################################
+        return t
+
+
+    #--------------------------
+    @staticmethod
+    def load_dataset(filename='data2.csv'):
+        '''
+            Load dataset 2 from the CSV file: data2.csv. 
+            The first row of the file is the header (including the names of the attributes)
+            In the remaining rows, each row represents one data instance.
+            The first column of the file is the label to be predicted.
+            In remaining columns, each column represents an attribute.
+            Input:
+                filename: the filename of the dataset, a string.
+            Output:
+                X: the feature matrix, a numpy matrix of shape p by n.
+                   Each element can be int/float/string.
+                   Here n is the number data instances in the dataset, p is the number of attributes.
+                Y: the class labels, a numpy array of length n.
+                   Each element can be int/float/string.
+        '''
+        #########################################
+        ## INSERT YOUR CODE HERE
+        reader = csv.reader(open("data2.csv", "rb"), delimiter=",")
+        x = list(reader)
+        a = np.array(x) 
+        b = a.copy()
+        A = a[1:,1:].T
+        X = np.array(A, dtype=float)
+        Y = b[1:,0].T
+
+
+ 
+        #########################################
+        return X,Y
 
 
 
